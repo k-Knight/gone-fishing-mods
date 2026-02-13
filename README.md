@@ -1,6 +1,6 @@
 # GONE Fishing Mods
 
-A collection of mods for GONE Fishing. These mods are designed to adjust gameplay pacing and provide additional utility during fishing sessions.
+A collection of mods for GONE Fishing. These mods are designed to prove quality of life and little visual enhancements like a custom game cursor.
 
 > [!WARNING]
 > **Software is provided "as is", without warranty of any kind.** Use these mods at your own risk. The author is not responsible for any save file corruption, multiplayer bans (however, unless you do this publicly this will not be detected by the game, unless the devs change something), or technical issues resulting from their use.
@@ -9,7 +9,7 @@ A collection of mods for GONE Fishing. These mods are designed to adjust gamepla
 
 These mods require **UE4SS (Unreal Engine 4 Scripting System)** to function.
 
-1.  Download the latest version of [UE4SS from GitHub](https://github.com).
+1.  Download the latest version of [UE4SS from GitHub](https://github.com/UE4SS-RE/RE-UE4SS).
 2.  Install **UE4SS** into your game binaries folder.
 3.  Place the individual mod folders from this repository into the following directory:
     `GONEfishing.exe/GONEfishing/Binaries/Win64/ue4ss/Mods/`
@@ -17,6 +17,9 @@ These mods require **UE4SS (Unreal Engine 4 Scripting System)** to function.
 ---
 
 ## 📦 Mod List
+
+### 🖱️ CustomFishingCursor
+Provide a new game cursor in a form of a fishing rod to replace the default Windows cursor.
 
 ### 🍺 FasterBeerDrinking
 Decreases the time required to finish the drinking animation, allowing for faster consumption.
@@ -31,3 +34,4 @@ Adds a notification system for active bites and adjusts catch RNG.
 *   **Reporting**: Displays the species of the fish currently on the hook.
 *   **Luck Logic**: Automatically rerolls the fish encounter **N** times and selects the best result.
 *   **Configuration**: Edit `settings.lua` within the mod folder. Set `LuckFactor` to `0` to disable the reroll mechanic while keeping the fish reporting active.
+
