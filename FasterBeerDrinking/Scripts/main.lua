@@ -26,7 +26,7 @@ FasterBeerDrinking.GetLocalPlayerFishingClient = function()
     end
 
     if not my_fishing_client then
-        print("\n[Fish Bite] cannot find player's fishing client !!!\n")
+        print("[FasterBeerDrinking] cannot find player's fishing client !!!\n")
     end
 
     return my_fishing_client
@@ -37,16 +37,16 @@ FasterBeerDrinking.SpeedUpBeerDrinking = function()
     
     if DrinkAnim:IsValid() then
         DrinkAnim.RateScale = 3.0
-        print("[LuckierFishByte] Speeding up Idle_DrinkReal to 3x")
+        print("[FasterBeerDrinking] Speeding up Idle_DrinkReal to 3x\n")
     else
-        print("[LuckierFishByte] Could not find Drink animation asset!")
+        print("[FasterBeerDrinking] Could not find Drink animation asset!\n")
     end
 
     RegisterHook("/Game/Items/Beer/AC_BEERAndalsoUpgradesAndAlsoEmotes.AC_BEERAndalsoUpgradesAndAlsoEmotes_C:DrinkingBeerLogic",
     function(self, ...)
         print("[FasterBeerDrinking] started drinking beer\n")
 
-        RetriggerableExecuteInGameThreadWithDelay(314, 3000, function()
+        RetriggerableExecuteInGameThreadWithDelay(314, 2550, function()
             local my_fishing_client = FasterBeerDrinking.GetLocalPlayerFishingClient()
             if not (my_fishing_client and my_fishing_client:IsValid()) then
                 return

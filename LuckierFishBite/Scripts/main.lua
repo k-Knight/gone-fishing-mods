@@ -1,6 +1,19 @@
 ExecuteInGameThread(function()
     LuckierFishBite = LuckierFishBite or {}
 
+    LuckierFishBite.DefaultConfig = {
+        ["LuckFactor"] = 5,
+        ["LuckyPullLuckMult"] = 10,
+        ["RarePullLuckMult"] = 100,
+        ["MythicPullLuckMult"] = 1000,
+        ["CatchSpecial"] = true,
+    
+        ["MythicPullHotkey"] = "F9",
+        ["RarePullHotkey"] = "F8",
+        ["LuckyPullHotkey"] = "F7",
+        ["ToggleHotspotHotkey"] = "F6",
+    }
+
     LuckierFishBite.LoadConfig = function()
         local cur_path = tostring(debug.getinfo(1).source):gsub("^@", ""):gsub("\\Scripts\\main.lua$", ""):gsub("/Scripts/main.lua$", "")
         local configPath = cur_path .. "\\settings.lua"
@@ -8,18 +21,66 @@ ExecuteInGameThread(function()
         local success, result = pcall(dofile, configPath)
 
         if success then
-            print(tostring(result) .. "\n")
-            LuckierFishBite.LuckFactor = result.LuckFactor or 10
-            print("[LuckierFishBite] settings LuckFactor :: " .. tostring(LuckierFishBite.LuckFactor) .. "\n")
-            LuckierFishBite.CatchSpecial = result.CatchSpecial == nil and true or result.CatchSpecial
-            print("[LuckierFishBite] settings CatchSpecial :: " .. tostring(LuckierFishBite.CatchSpecial) .. "\n")
+            for k, v in pairs(result) do
+                print("[LuckierFishBite] settings " .. k .. " :: " .. tostring(v) .. "\n")
+                LuckierFishBite[k] = v
+            end
+            for k, v in pairs(LuckierFishBite.DefaultConfig) do
+                if type(LuckierFishBite[k]) ~= type(v) then
+                    print("[LuckierFishBite] settings " .. k .. " :: " .. tostring(v) .. "\n")
+                    LuckierFishBite[k] = v
+                end
+            end
         else
-            print("error :: " .. tostring(result) .. "\n")
+            print("[LuckierFishBite] config error :: " .. tostring(result) .. "\n")
         end
-
     end
-
     LuckierFishBite.LoadConfig()
+
+    LuckierFishBite.LuckMult = 1
+    LuckierFishBite.ForceEnableHotsport = false
+
+    RegisterKeyBind(Key[LuckierFishBite.LuckyPullHotkey], function()
+        local my_fishing_client = LuckierFishBite.GetLocalPlayerFishingClient()
+
+        if my_fishing_client and my_fishing_client:IsValid() then
+            LuckierFishBite.LuckMult = LuckierFishBite.LuckyPullLuckMult
+            LuckierFishBite.SendLocalChatMessage(my_fishing_client, "LuckierFishBite", "next pull will be extra lucky (" .. tostring(LuckierFishBite.LuckMult * LuckierFishBite.LuckFactor) .. " rerolls)", {R=0.3, G=0.4, B=0.45, A=1.0})
+        end
+    end)
+
+    RegisterKeyBind(Key[LuckierFishBite.RarePullHotkey], function()
+        local my_fishing_client = LuckierFishBite.GetLocalPlayerFishingClient()
+
+        if my_fishing_client and my_fishing_client:IsValid() then
+            LuckierFishBite.LuckMult = LuckierFishBite.RarePullLuckMult
+            LuckierFishBite.SendLocalChatMessage(my_fishing_client, "LuckierFishBite", "next pull will be a rare one (" .. tostring(LuckierFishBite.LuckMult * LuckierFishBite.LuckFactor) .. " rerolls)", {R=0.3, G=0.4, B=0.45, A=1.0})
+        end
+    end)
+
+    RegisterKeyBind(Key[LuckierFishBite.MythicPullHotkey], function()
+        local my_fishing_client = LuckierFishBite.GetLocalPlayerFishingClient()
+
+        if my_fishing_client and my_fishing_client:IsValid() then
+            LuckierFishBite.LuckMult = LuckierFishBite.MythicPullLuckMult
+            LuckierFishBite.SendLocalChatMessage(my_fishing_client, "LuckierFishBite", "next pull will be mythical (" .. tostring(LuckierFishBite.LuckMult * LuckierFishBite.LuckFactor) .. " rerolls)", {R=0.3, G=0.4, B=0.45, A=1.0})
+        end
+    end)
+
+    RegisterKeyBind(Key[LuckierFishBite.ToggleHotspotHotkey], function()
+        local my_fishing_client = LuckierFishBite.GetLocalPlayerFishingClient()
+
+        if my_fishing_client and my_fishing_client:IsValid() then
+            LuckierFishBite.ForceEnableHotsport = not LuckierFishBite.ForceEnableHotsport
+    
+    
+            if LuckierFishBite.ForceEnableHotsport then
+                LuckierFishBite.SendLocalChatMessage(my_fishing_client, "LuckierFishBite", "force hotspot enabled", {R=0.3, G=0.4, B=0.45, A=1.0})
+            else
+                LuckierFishBite.SendLocalChatMessage(my_fishing_client, "LuckierFishBite", "force hotspot disabled", {R=0.3, G=0.4, B=0.45, A=1.0})
+            end
+        end
+    end)
 
     LuckierFishBite.CurrentFishingClient = nil
 
@@ -57,22 +118,132 @@ ExecuteInGameThread(function()
         return my_fishing_client
     end
 
+    LuckierFishBite.MySpecialMsgType = 31
 
-    LuckierFishBite.SendLocalChatMessage = function(my_fish_client, src, msg)
+    LuckierFishBite.OnExecuteUbergraph_Message = function(self, ...)
+        if LuckierFishBite.OnExecuteUbergraph_Message_Reroll then
+            return
+        end
+        LuckierFishBite.OnExecuteUbergraph_Message_Reroll = true
+
+        local status, error = pcall(function()
+            local self = self:Get()
+
+            local msg_type = self["Message Type"]
+
+            if msg_type == LuckierFishBite.MySpecialMsgType then
+                if not LuckierFishBite.HidingChatMessage then
+                    local text = self.Name:ToString()
+                    local color = self.NameColor
+                    local msg_text = self.MessageText
+
+                    self["Message Type"] = 0
+                    self:Message()
+                    self["Message Type"] = LuckierFishBite.MySpecialMsgType
+
+                    local MyColor = {
+                        SpecifiedColor = {R=color.R, G=color.G, B=color.B, A=color.A},
+                        ColorUseRule = 0
+                    }
+
+                    msg_text.SetDefaultColorAndOpacity(MyColor)
+                    msg_text:SetText(FText(text))
+                else
+                    LuckierFishBite.HidingChatMessage = false
+                end
+            end
+        end)
+
+        LuckierFishBite.OnExecuteUbergraph_Message_Reroll = false
+
+        if not status then
+            print(error .. "\n")
+        end
+    end
+
+    if not LuckierFishBite.RegisteredHookOnExecuteUbergraph_Message then
+        RegisterHook("Function /Game/MultiplayerChat/ChatWidgets/Message.Message_C:ExecuteUbergraph_Message", function(self, ...)
+            LuckierFishBite.OnExecuteUbergraph_Message(self, ...)
+        end)
+
+        LuckierFishBite.RegisteredHookOnExecuteUbergraph_Message = true
+    end
+
+    LuckierFishBite.OnHideMessage = function(self, ...)
+        local self = self:Get()
+
+        local msg_type = self["Message Type"]
+
+        if msg_type == LuckierFishBite.MySpecialMsgType then
+            LuckierFishBite.HidingChatMessage = true
+        end
+    end
+
+    if not LuckierFishBite.RegisteredHookOnHideMessage then
+        RegisterHook("Function /Game/MultiplayerChat/ChatWidgets/Message.Message_C:HideMessage", function(self, ...)
+            LuckierFishBite.OnHideMessage(self, ...)
+        end)
+        RegisterHook("Function /Game/MultiplayerChat/ChatWidgets/Message.Message_C:HideBackground", function(self, ...)
+            LuckierFishBite.OnHideMessage(self, ...)
+        end)
+        RegisterHook("Function /Game/MultiplayerChat/ChatWidgets/Message.Message_C:HideMessageAfterTimer", function(self, ...)
+            LuckierFishBite.OnHideMessage(self, ...)
+        end)
+        RegisterHook("Function /Game/MultiplayerChat/ChatWidgets/Message.Message_C:HidebackgroundAfterTimer", function(self, ...)
+            LuckierFishBite.OnHideMessage(self, ...)
+        end)
+
+        LuckierFishBite.RegisteredHookOnHideMessage = true
+    end
+
+    LuckierFishBite.SendLocalChatMessage = function(my_fish_client, src, msg, color)
         if my_fish_client then
             local player_character = my_fish_client.PlayerCharacter
             local PC = player_character.PlayerController
             local chat = PC.MultiplayerChat_C
 
             if chat and chat:IsValid() then
-            
+
                 local MessageType = 0
-                local MyText = FText(msg)
-                local MyPlayerName = FName(src)
-                local MyColor = {R=0.3, G=0.4, B=0.5, A=1.0}
+                local MyText = FText("")
+                local MyPlayerName = FName("[".. src .. "] " .. msg)
                 local Channel = 0
-            
-                chat["MC_Enter Text"](chat, MessageType, MyText, MyPlayerName, MyColor, Channel)
+
+                chat["Enter Text Function"](chat, MessageType, MyText, MyPlayerName, color, Channel)
+
+                local chat_internal = chat["Chat Ref"]
+                if not (chat_internal and chat_internal:IsValid()) then
+                    print("[LuckierFishBite] no Chat Ref !!!\n")
+                    return
+                end
+
+                local chat_scroll = chat_internal.GeneralChatScrollBox
+                if not (chat_scroll and chat_scroll:IsValid()) then
+                    print("[LuckierFishBite] no GeneralChatScrollBox !!!\n")
+                    return
+                end
+
+                local msg_slot = chat_scroll.Slots[1]
+                if not (msg_slot and msg_slot:IsValid()) then
+                    print("[LuckierFishBite] no Slots[1] !!!\n")
+                    return
+                end
+
+                local chat_msg = msg_slot.Content
+                if not (chat_msg and chat_msg:IsValid()) then
+                    print("[LuckierFishBite] no Content !!!\n")
+                    return
+                end
+
+                local msg_text = chat_msg.MessageText
+                if not (msg_text and msg_text:IsValid()) then
+                    print("[LuckierFishBite] no MessageText !!!\n")
+                    return
+                end
+
+                chat_msg["Message Type"] = LuckierFishBite.MySpecialMsgType
+                chat_msg.NameColor = color
+                chat_msg:ShowMessage()
             end
         end
     end
@@ -100,7 +271,7 @@ ExecuteInGameThread(function()
                 print("[LuckierFishBite] fish weight :: " .. fish_weight_str .. " !\n")
                 print("[LuckierFishBite] bait score :: " .. bait_score_str .. " !\n")
 
-                LuckierFishBite.SendLocalChatMessage(my_fishing_client, "[Fish Bite]", fish_name .. " weighing " .. fish_weight_str .. "(" .. bait_score_str .. " bait score)")
+                LuckierFishBite.SendLocalChatMessage(my_fishing_client, "Fish Bite", fish_name .. "\n                    weighing " .. fish_weight_str .. "\n                    " .. bait_score_str .. " bait score", {R=0.3, G=0.4, B=0.45, A=1.0})
             end
         end)
     end
@@ -121,31 +292,42 @@ ExecuteInGameThread(function()
 
     LuckierFishBite.FindFishCurve = function(TargetRowName)
         local target = TargetRowName:lower()
-        
+
         return LuckierFishBite.FishWeightCurves[target] or nil
     end
 
     LuckierFishBite.GetCurveVal = function(curve, x)
         local y = curve:GetFloatValue(x)
-        
+
         return y
     end
 
     LuckierFishBite.OnFishBite = function(self, IsInCave, IsInHotspot, ActiveFishRank, CurrentFishName)
+        local my_fishing_client = LuckierFishBite.GetLocalPlayerFishingClient()
+        
+        if not (my_fishing_client and my_fishing_client:IsValid()) then
+            return
+        end
+
         if LuckierFishBite.LuckFactor == 0 then
             LuckierFishBite.ReportFishBite()
             return
         end
 
+        local rerolls = LuckierFishBite.LuckMult * LuckierFishBite.LuckFactor
+        LuckierFishBite.LuckMult = 1
+
         LuckierFishBite.best_catch = nil
         local myself = self:Get()
         local in_cave = IsInCave:Get() and true or false
-        local in_hotspot = IsInHotspot:Get() and true or false
+        local in_hotspot = IsInHotspot:Get() and true or LuckierFishBite.ForceEnableHotsport
 
-        local my_fishing_client = LuckierFishBite.GetLocalPlayerFishingClient()
+        local orig_hotspot_val = my_fishing_client["HotSpot?"]
+        local orig_hotspot_mythic_val = my_fishing_client["hotspotMythic?"]
 
-        if not (my_fishing_client and my_fishing_client:IsValid()) then
-            return
+        if LuckierFishBite.ForceEnableHotsport then
+            my_fishing_client["HotSpot?"] = true
+            my_fishing_client["hotspotMythic?"] = true
         end
 
         local OutRank = { ["Active Fish Rank (1-10)"] = 0.0 }
@@ -167,7 +349,7 @@ ExecuteInGameThread(function()
             ["CalcWeight"] = calc_weight
         }
 
-        for i=1,LuckierFishBite.LuckFactor do
+        for i=1,rerolls do
             my_fishing_client["DecideFish (FishBites)"](my_fishing_client, in_cave, in_hotspot, OutRank, OutName)
 
             fish_name = my_fishing_client["CurrentFishName"]:ToString() or "Empty"
@@ -200,11 +382,23 @@ ExecuteInGameThread(function()
             end
         end
 
-        if special_catch and math.random(1, math.max(math.floor(LuckierFishBite.LuckFactor / 2), 3)) <= 2 then
+        if special_catch and math.random(1, math.max(math.floor(rerolls), 3)) <= 2 then
             best_catch = special_catch
         end
 
-        print("[LuckierFishBite] rerolled " .. tostring(LuckierFishBite.LuckFactor) .. " times\n")
+        RetriggerableExecuteInGameThreadWithDelay(316, 100, function()
+            local my_fishing_client = LuckierFishBite.GetLocalPlayerFishingClient()
+        
+            if not (my_fishing_client and my_fishing_client:IsValid()) then
+                return
+            end
+
+            print("[LuckierFishBite] restoring hotspot modifiers\n")
+            my_fishing_client["HotSpot?"] = orig_hotspot_val
+            my_fishing_client["hotspotMythic?"] = orig_hotspot_mythic_val
+        end)
+
+        print("[LuckierFishBite] rerolled " .. tostring(rerolls) .. " times\n")
 
         my_fishing_client["CurrentFishName"] = FName(best_catch["CurrentFishName"])
         my_fishing_client["FishWeight"] = best_catch["FishWeight"]
@@ -225,7 +419,7 @@ ExecuteInGameThread(function()
             if LuckierFishBite.IsRerollingOnFishBite then
                 return
             end
-        
+
             LuckierFishBite.IsRerollingOnFishBite = true
             LuckierFishBite.OnFishBite(self, IsInCave, IsInHotspot, ActiveFishRank, CurrentFishName)
             LuckierFishBite.IsRerollingOnFishBite = false

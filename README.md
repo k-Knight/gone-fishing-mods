@@ -3,7 +3,7 @@
 A collection of mods for GONE Fishing. These mods are designed to adjust gameplay pacing and provide additional utility during fishing sessions.
 
 > [!WARNING]
-> **Software is provided "as is", without warranty of any kind.** Use these mods at your own risk. The author is not responsible for any save file corruption, multiplayer bans, or technical issues resulting from their use.
+> **Software is provided "as is", without warranty of any kind.** Use these mods at your own risk. The author is not responsible for any save file corruption, multiplayer bans (however, unless you do this publicly this will not be detected by the game, unless the devs change something), or technical issues resulting from their use.
 
 ## 🛠 Installation
 
