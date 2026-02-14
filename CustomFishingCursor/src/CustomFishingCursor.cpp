@@ -27,7 +27,7 @@ typedef ULONG_PTR (WINAPI *SetClassLongPtrW_t)(HWND hWnd, int nIndex, LONG_PTR d
 SetClassLongPtrW_t TrueSetClassLongPtrW = SetClassLongPtrW;
 
 ULONG_PTR WINAPI HookedSetClassLongPtrW(HWND hWnd, int nIndex, LONG_PTR dwNewLong) {
-    if (nIndex == GCLP_HCURSOR && hCustomCursor != NULL)
+    if (nIndex == GCLP_HCURSOR && dwNewLong && hCustomCursor != NULL)
         return TrueSetClassLongPtrW(hWnd, nIndex, (LONG_PTR)hCustomCursor);
 
     return TrueSetClassLongPtrW(hWnd, nIndex, dwNewLong);
@@ -37,7 +37,7 @@ typedef ULONG_PTR (WINAPI *SetClassLongPtrA_t)(HWND hWnd, int nIndex, LONG_PTR d
 SetClassLongPtrA_t TrueSetClassLongPtrA = SetClassLongPtrA;
 
 ULONG_PTR WINAPI HookedSetClassLongPtrA(HWND hWnd, int nIndex, LONG_PTR dwNewLong) {
-    if (nIndex == GCLP_HCURSOR && hCustomCursor != NULL)
+    if (nIndex == GCLP_HCURSOR && dwNewLong && hCustomCursor != NULL)
         return TrueSetClassLongPtrA(hWnd, nIndex, (LONG_PTR)hCustomCursor);
 
     return TrueSetClassLongPtrA(hWnd, nIndex, dwNewLong);
