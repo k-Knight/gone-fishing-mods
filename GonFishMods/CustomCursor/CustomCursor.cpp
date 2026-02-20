@@ -66,8 +66,8 @@ __declspec(dllexport) void start_CustomFishingCursor() {
         if (lastSlash)
             *(lastSlash + 1) = L'\0';
 
-        wcscat_s(cursorPath, MAX_PATH, L"cursor.cur");
-        wprintf(L"[CursorMod] cursor path :: \"%ls\"\n", cursorPath);
+        wcscat_s(cursorPath, MAX_PATH, L"..\\Resources\\CustomFishingCursor\\cursor.cur");
+        wprintf(L"[CustomCursor] cursor path :: \"%ls\"\n", cursorPath);
 
         hCustomCursor = (HCURSOR)LoadImageW(
             NULL,
@@ -79,7 +79,7 @@ __declspec(dllexport) void start_CustomFishingCursor() {
 
 
         if (hCustomCursor == NULL) {
-            wprintf(L"[CursorMod] failed to load cursor !\n");
+            wprintf(L"[CustomCursor] failed to load cursor !\n");
             return;
         }
 

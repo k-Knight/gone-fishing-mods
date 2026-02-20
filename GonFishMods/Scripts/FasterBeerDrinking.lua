@@ -1,4 +1,4 @@
-ExecuteInGameThread(function()
+return function(mod_settings)
 
 FasterBeerDrinking = FasterBeerDrinking or {}
 
@@ -46,7 +46,7 @@ FasterBeerDrinking.SpeedUpBeerDrinking = function()
     function(self, ...)
         print("[FasterBeerDrinking] started drinking beer\n")
 
-        RetriggerableExecuteInGameThreadWithDelay(314, 2550, function()
+        GonFishModAPI.AddTask(2550, function()
             local my_fishing_client = FasterBeerDrinking.GetLocalPlayerFishingClient()
             if not (my_fishing_client and my_fishing_client:IsValid()) then
                 return
@@ -74,4 +74,4 @@ end
 
 FasterBeerDrinking.SpeedUpBeerDrinking()
 
-end)
+end

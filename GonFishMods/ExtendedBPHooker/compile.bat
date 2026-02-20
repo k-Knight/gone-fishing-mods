@@ -1,0 +1,1 @@
+clang++ ExtendedBPHooker.cpp -o ExtendedBPHooker.dll -m64 -static -shared -Idetours/include -Ldetours/lib -ldetours -luser32 -O3

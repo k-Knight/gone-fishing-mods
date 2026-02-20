@@ -1,4 +1,4 @@
-ExecuteInGameThread(function()
+return function()
     ForceEnablePerks = ForceEnablePerks or {}
 
     ForceEnablePerks.CurrentFishingClient = nil
@@ -67,5 +67,4 @@ ExecuteInGameThread(function()
         ForceEnablePerks.LoopStarted = true
         LoopInGameThreadWithDelay(3333, ForceEnablePerks.CheckPlayer)
     end
-end)
--- Function /Game/ThirdPerson/Blueprints/AC_Perks.AC_Perks_C:SetSprintSpeed
+end

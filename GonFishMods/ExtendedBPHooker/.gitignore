@@ -1,0 +1,3 @@
+detours/
+*.lib
+*.exp

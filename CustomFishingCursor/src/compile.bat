@@ -1,1 +1,0 @@
-clang++ CustomFishingCursor.cpp -o CustomFishingCursor.dll -m64 -static -shared -Idetours/include -Ldetours/lib -ldetours -luser32 -O3
