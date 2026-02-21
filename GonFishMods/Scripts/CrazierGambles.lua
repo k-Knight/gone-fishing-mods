@@ -106,30 +106,31 @@ return function(mod_settings)
     end
 
     CrazeirGambles.targer_function = "/Game/PaulosCreations/DemonicAltar_HellGate_BloodPool/BloodPool/BluePrints/BP_BloodPool.BP_BloodPool_C:ScaleFishCompeteServer"
+    CrazeirGambles.BloodPoolFunctionInstances = {}
 
-    CrazeirGambles.TryFindBloodpoolUbergraph = function()
+    CrazeirGambles.TryFindBloodpoolScaleFishCompeteServer = function()
         if not (GonFishModAPI.AddFunctionPrehook and GonFishModAPI.AddRandomFloatInRangePosthook) then
             print("[CrazeirGambles] missing necesary hooking functions, exiting\n")
             return
         end
 
-        print("[CrazeirGambles] starting a bloodpoolfinder loop\n")
-        LoopAsync(500, function()
-            local TargetFunction = StaticFindObject(CrazeirGambles.targer_function)
+        local TargetFunction = StaticFindObject(CrazeirGambles.targer_function)
 
-            if TargetFunction:IsValid() then
-                local addr_hex = string.format("%X", TargetFunction:GetAddress())
+        if TargetFunction:IsValid() then
+            local addr_hex = string.format("%X", TargetFunction:GetAddress())
+
+            if not CrazeirGambles.BloodPoolFunctionInstances[addr_hex] then
+                CrazeirGambles.BloodPoolFunctionInstances[addr_hex] = true
                 print("[CrazeirGambles] found target function ...\n")
-
+    
                 GonFishModAPI.AddTask(7500, function()
                     print("[CrazeirGambles]  registering hooks ...\n")
-
+    
                     GonFishModAPI.AddFunctionPrehook("ScaleFishCompeteServer", addr_hex, CrazeirGambles.ScaleFishCompeteServer_Pre)
-                    GonFishModAPI.AddRandomFloatInRangePosthook(CrazeirGambles.RandomFloatInRange_Post)
-
+    
                     RegisterHook(CrazeirGambles.targer_function, function(self, ...)
                         print("[CrazeirGambles] exiting ScaleFishCompeteServer() !!\n")
-    
+        
                         if CrazeirGambles.latest_bloodpool_instance then
                             print("[CrazeirGambles] latest blood pool instance :: " .. tostring(CrazeirGambles.latest_bloodpool_instance) .. "\n")
                         end
@@ -138,13 +139,13 @@ return function(mod_settings)
                         CrazeirGambles.do_max_win = false
                     end)
                 end)
-
-                return true
             end
+        end
 
-            return false
-        end)
+        GonFishModAPI.AddTask(500, CrazeirGambles.TryFindBloodpoolScaleFishCompeteServer)
     end
 
-    CrazeirGambles.TryFindBloodpoolUbergraph()
+    GonFishModAPI.AddRandomFloatInRangePosthook(CrazeirGambles.RandomFloatInRange_Post)
+    print("[CrazeirGambles] starting a bloodpoolfinder loop\n")
+    GonFishModAPI.AddTask(500, CrazeirGambles.TryFindBloodpoolScaleFishCompeteServer)
 end

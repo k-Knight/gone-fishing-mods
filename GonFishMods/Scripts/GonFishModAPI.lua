@@ -41,6 +41,7 @@ GonFishModAPI.OnExecuteUbergraph_Message = function(self, ...)
     if GonFishModAPI.OnExecuteUbergraph_Message_Reroll then
         return
     end
+
     GonFishModAPI.OnExecuteUbergraph_Message_Reroll = true
 
     local status, error = pcall(function()
@@ -169,6 +170,13 @@ end
 GonFishModAPI.TaskCounter = 0
 GonFishModAPI.SchedulerTasks = {}
 GonFishModAPI.AddTask = function(delay, callback)
+    if not (delay and type(callback) == "function") then
+        print("GonFishModAPI] wrong parameters to AddTask() !\n")
+        print("    delay :: " .. tostring(delay) .. "\n")
+        print("    callback :: " .. tostring(callback) .. "\n")
+        return
+    end
+
     local time = os.clock() + (delay / 1000.0)
 
     GonFishModAPI.TaskCounter = GonFishModAPI.TaskCounter + 1
@@ -182,13 +190,24 @@ GonFishModAPI.SchedulerRun = function()
     local time = os.clock()
 
     for key, task in pairs(GonFishModAPI.SchedulerTasks) do
-        if task.time <= time then
+        if task and task.time and task.callback and task.time <= time then
             task.callback()
             GonFishModAPI.SchedulerTasks[key] = nil
             break
         end
     end
 end
+
+GonFishModAPI.OnTick = function()
+    local status, err = pcall(GonFishModAPI.SchedulerRun)
+
+    if not status then
+        print("[GonFishModAPI] lua error :: " .. tostring(err) .. "\n")
+    end
+
+    return false
+end
+
 
 print("[GonFishModAPI] delaying hooks and dll loading ...\n")
 
@@ -246,11 +265,7 @@ RetriggerableExecuteInGameThreadWithDelay(GonFishModAPI.TreadWithDelayID, 2000, 
         GonFishModAPI.AddRandomIntegerInRangePosthook = add_random_integer_in_range_posthook
     end
 
-    LoopAsync(0, function()
-        GonFishModAPI.SchedulerRun()
-
-        return false
-    end)
+    LoopAsync(10, GonFishModAPI.OnTick)
 
     GonFishModAPI.initialized = true
 end)

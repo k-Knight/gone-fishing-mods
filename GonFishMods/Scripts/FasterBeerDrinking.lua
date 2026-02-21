@@ -32,6 +32,34 @@ FasterBeerDrinking.GetLocalPlayerFishingClient = function()
     return my_fishing_client
 end
 
+FasterBeerDrinking.OnDrinkingBeerLogic = function(self, ...)
+    print("[FasterBeerDrinking] started drinking beer\n")
+
+    GonFishModAPI.AddTask(2550, function()
+        local my_fishing_client = FasterBeerDrinking.GetLocalPlayerFishingClient()
+        if not (my_fishing_client and my_fishing_client:IsValid()) then
+            return
+        end
+    
+        local player_character = my_fishing_client.PlayerCharacter
+        if not (player_character and player_character:IsValid()) then
+            return
+        end
+    
+        local beer_controller = player_character.AC_BEER
+        if not (beer_controller and beer_controller:IsValid()) then
+            return
+        end
+
+        print("[FasterBeerDrinking] found local beer controller\n")
+        if not beer_controller["CanDrink?"] then
+            beer_controller.BeerComplete(beer_controller)
+        else
+            print("[FasterBeerDrinking] not drinking beer currently\n")
+        end
+    end)
+end
+
 FasterBeerDrinking.SpeedUpBeerDrinking = function()
     local DrinkAnim = StaticFindObject("/Game/Characters/PlaceHolder/Animations/Idle_DrinkReal.Idle_DrinkReal")
     
@@ -42,34 +70,7 @@ FasterBeerDrinking.SpeedUpBeerDrinking = function()
         print("[FasterBeerDrinking] Could not find Drink animation asset!\n")
     end
 
-    RegisterHook("/Game/Items/Beer/AC_BEERAndalsoUpgradesAndAlsoEmotes.AC_BEERAndalsoUpgradesAndAlsoEmotes_C:DrinkingBeerLogic",
-    function(self, ...)
-        print("[FasterBeerDrinking] started drinking beer\n")
-
-        GonFishModAPI.AddTask(2550, function()
-            local my_fishing_client = FasterBeerDrinking.GetLocalPlayerFishingClient()
-            if not (my_fishing_client and my_fishing_client:IsValid()) then
-                return
-            end
-        
-            local player_character = my_fishing_client.PlayerCharacter
-            if not (player_character and player_character:IsValid()) then
-                return
-            end
-        
-            local beer_controller = player_character.AC_BEER
-            if not (beer_controller and beer_controller:IsValid()) then
-                return
-            end
-
-            print("[FasterBeerDrinking] found local beer controller\n")
-            if not beer_controller["CanDrink?"] then
-                beer_controller.BeerComplete(beer_controller)
-            else
-                print("[FasterBeerDrinking] not drinking beer currently\n")
-            end
-        end)
-    end)
+    RegisterHook("/Game/Items/Beer/AC_BEERAndalsoUpgradesAndAlsoEmotes.AC_BEERAndalsoUpgradesAndAlsoEmotes_C:DrinkingBeerLogic", FasterBeerDrinking.OnDrinkingBeerLogic)
 end
 
 FasterBeerDrinking.SpeedUpBeerDrinking()

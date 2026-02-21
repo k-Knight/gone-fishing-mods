@@ -564,7 +564,7 @@ extern "C" {
     std::vector<lua_hook> lua_random_integer_in_range_posthooks;
 
     void __fastcall hook_ukismet_math_library_exec_random_float_in_range(void *uobject, void *fframe, double *output) {
-        std::lock_guard<std::recursive_mutex> lock(exec_random_float_in_range_mutex);
+        //std::lock_guard<std::recursive_mutex> lock(exec_random_float_in_range_mutex);
 
         void *v5; // r8
         void *v6; // r8
@@ -621,6 +621,8 @@ extern "C" {
         }
 
         for (const lua_hook &lua_posthook : lua_random_float_in_range_posthooks) {
+            std::lock_guard<std::recursive_mutex> lock(g_mutex);
+
             lua_State *L = lua_posthook.L;
             r_lua_rawgeti(L, LUA_REGISTRYINDEX, lua_posthook.luaCallbackRef);
 
@@ -645,7 +647,7 @@ extern "C" {
     }
 
     void __fastcall hook_ukismet_math_library_exec_random_integer_in_range(void *uobject, void *fframe, int *output) {
-        std::lock_guard<std::recursive_mutex> lock(exec_random_integer_in_range_mutex);
+        //std::lock_guard<std::recursive_mutex> lock(exec_random_integer_in_range_mutex);
 
         void *v5; // r8
         void *v6; // r8
@@ -718,6 +720,8 @@ extern "C" {
         }
 
         for (const lua_hook &lua_posthook : lua_random_integer_in_range_posthooks) {
+            std::lock_guard<std::recursive_mutex> lock(g_mutex);
+
             lua_State *L = lua_posthook.L;
             r_lua_rawgeti(L, LUA_REGISTRYINDEX, lua_posthook.luaCallbackRef);
 
@@ -742,13 +746,15 @@ extern "C" {
     }
 
     void __fastcall hook_uobject_process_internal(void *uobject, void *fframe, void *result) {
-        std::lock_guard<std::recursive_mutex> lock(process_internal_mutex);
+        //std::lock_guard<std::recursive_mutex> lock(process_internal_mutex);
 
         if (fframe) {
             void *u_fun_ptr = *(void **)((size_t)fframe + 0x10); // can be 0x08 sometimes too
             auto it = lua_bp_prehooks.find(u_fun_ptr);
 
             if (it != lua_bp_prehooks.end()) {
+                std::lock_guard<std::recursive_mutex> lock(g_mutex);
+
                 lua_State *L = it->second.L;
                 r_lua_rawgeti(L, LUA_REGISTRYINDEX, it->second.luaCallbackRef);
 
@@ -766,10 +772,12 @@ extern "C" {
     }
 
     void __stdcall hook_uobject_process_event(void *_this, void *pFunction, void *pParms) {
-        std::lock_guard<std::recursive_mutex> lock(process_event_mutex);
+        //std::lock_guard<std::recursive_mutex> lock(process_event_mutex);
 
         auto it = lua_bp_prehooks.find(pFunction);
         if (it != lua_bp_prehooks.end()) {
+            std::lock_guard<std::recursive_mutex> lock(g_mutex);
+
             lua_State *L = it->second.L;
             r_lua_rawgeti(L, LUA_REGISTRYINDEX, it->second.luaCallbackRef);
 
