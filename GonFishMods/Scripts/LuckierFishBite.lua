@@ -133,11 +133,76 @@ return function(mod_settings)
         return y
     end
 
+    LuckierFishBite.StateBefore = {
+        "jeremyWadeBonus",
+        "Fish Ranking(1-10)(Each Type)",
+        "baitScoreRandom",
+        "FishBucket",
+        "morningBonus",
+        "DepthMultiplierLVL",
+        "nightTimeBonus",
+        "thunderstormBonus",
+        "daysSurvivedBonus",
+        "Bait Score",
+        "JeremyWade?"
+    }
+
+    LuckierFishBite.StateAfter = {
+        "LeviathanTotemMultiplier",
+        "jeremyWadeBonus",
+        "Fish Ranking(1-10)(Each Type)",
+        "DepthMultiplier",
+        "baitScoreRandom",
+        "FishBucket",
+        "morningBonus",
+        "NumInstrumentsPlayingOnBITE",
+        --"CurrentFishName", -- this is handled manually
+        "nightTimeBonus",
+        "thunderstormBonus",
+        "daysSurvivedBonus",
+        "Bait Score",
+        "DrunkScoreBonus",
+        "FishWeight"
+    }
+
+    LuckierFishBite.PreFishBiteState = nil
+
+    LuckierFishBite.GetPreFishBiteState = function(my_fishing_client)
+        local state = {}
+
+        for _, key in pairs(LuckierFishBite.StateBefore) do
+            state[key] = my_fishing_client[key]
+        end
+
+        LuckierFishBite.PreFishBiteState = state
+    end
+
+    LuckierFishBite.OnFishBite_Pre = function(self)
+        if LuckierFishBite.PreFishBiteState then
+            return
+        end
+
+        print("[LuckierFishBite] recording pre bite state ...\n")
+        local my_fishing_client = LuckierFishBite.GetLocalPlayerFishingClient()
+
+        if not (my_fishing_client and my_fishing_client:IsValid()) then
+            return
+        end
+
+        LuckierFishBite.GetPreFishBiteState(my_fishing_client)
+        print("[LuckierFishBite] recording pre state finished\n")
+    end
+
     LuckierFishBite.OnFishBite = function(self, IsInCave, IsInHotspot, ActiveFishRank, CurrentFishName)
         local my_fishing_client = LuckierFishBite.GetLocalPlayerFishingClient()
         
         if not (my_fishing_client and my_fishing_client:IsValid()) then
             return
+        end
+
+        if not LuckierFishBite.PreFishBiteState then
+            print("[LuckierFishBite] recording pre bite state (PREHOOK FAILED) ...\n")
+            LuckierFishBite.GetPreFishBiteState(my_fishing_client)
         end
 
         if LuckierFishBite.LuckFactor == 0 then
@@ -170,17 +235,18 @@ return function(mod_settings)
         local calc_weight = fish_weight_curve and LuckierFishBite.GetCurveVal(fish_weight_curve, fish_weight_rank) or 0
         local special_catch = nil
 
-        local best_catch = {
-            ["CurrentFishName"] = fish_name,
-            ["FishWeight"] = my_fishing_client["FishWeight"],
-            ["JeremyWade?"] = my_fishing_client["JeremyWade?"],
-            ["Bait Score"] = my_fishing_client["Bait Score"],
-            ["Fish Ranking(1-10)(Each Type)"] = fish_weight_rank,
-            ["FishBucket"] = my_fishing_client["FishBucket"],
-            ["CalcWeight"] = calc_weight
-        }
+        local best_catch = {}
+        for _, key in pairs(LuckierFishBite.StateAfter) do
+            best_catch[key] = my_fishing_client[key]
+        end
+        best_catch["CurrentFishName"] = fish_name
+        best_catch["CalcWeight"] = calc_weight
 
         for i=1,rerolls do
+            for key, value in pairs(LuckierFishBite.PreFishBiteState) do
+                my_fishing_client[key] = value
+            end
+
             my_fishing_client["DecideFish (FishBites)"](my_fishing_client, in_cave, in_hotspot, OutRank, OutName)
 
             fish_name = my_fishing_client["CurrentFishName"]:ToString() or "Empty"
@@ -188,28 +254,22 @@ return function(mod_settings)
             fish_weight_curve = LuckierFishBite.FindFishCurve(fish_name)
             calc_weight = fish_weight_curve and LuckierFishBite.GetCurveVal(fish_weight_curve, fish_weight_rank) or -1
 
-            if calc_weight < 0 and LuckierFishBite.CatchSpecial then
-                special_catch = {
-                    ["CurrentFishName"] = fish_name,
-                    ["FishWeight"] = my_fishing_client["FishWeight"],
-                    ["JeremyWade?"] = my_fishing_client["JeremyWade?"],
-                    ["Bait Score"] = my_fishing_client["Bait Score"],
-                    ["Fish Ranking(1-10)(Each Type)"] = fish_weight_rank,
-                    ["FishBucket"] = my_fishing_client["FishBucket"],
-                    ["CalcWeight"] = calc_weight
-                }
+            if calc_weight < 0 and LuckierFishBite.CatchSpecial and (not special_catch or special_catch["CurrentFishName"] ~= "Fish_Heart") then
+                special_catch = {}
+                for _, key in pairs(LuckierFishBite.StateAfter) do
+                    special_catch[key] = my_fishing_client[key]
+                end
+                special_catch["CurrentFishName"] = fish_name
+                special_catch["CalcWeight"] = calc_weight
             end
 
             if calc_weight > best_catch["CalcWeight"] then
-                best_catch = {
-                    ["CurrentFishName"] = fish_name,
-                    ["FishWeight"] = my_fishing_client["FishWeight"],
-                    ["JeremyWade?"] = my_fishing_client["JeremyWade?"],
-                    ["Bait Score"] = my_fishing_client["Bait Score"],
-                    ["Fish Ranking(1-10)(Each Type)"] = fish_weight_rank,
-                    ["FishBucket"] = my_fishing_client["FishBucket"],
-                    ["CalcWeight"] = calc_weight
-                }
+                local best_catch = {}
+                for _, key in pairs(LuckierFishBite.StateAfter) do
+                    best_catch[key] = my_fishing_client[key]
+                end
+                best_catch["CurrentFishName"] = fish_name
+                best_catch["CalcWeight"] = calc_weight
             end
         end
 
@@ -231,18 +291,20 @@ return function(mod_settings)
 
         print("[LuckierFishBite] rerolled " .. tostring(rerolls) .. " times\n")
 
+        for _, key in pairs(LuckierFishBite.StateAfter) do
+            if best_catch[key] ~= nil then
+                my_fishing_client[key] = best_catch[key]
+            end
+        end
         my_fishing_client["CurrentFishName"] = FName(best_catch["CurrentFishName"])
-        my_fishing_client["FishWeight"] = best_catch["FishWeight"]
-        my_fishing_client["JeremyWade?"] = best_catch["JeremyWade?"]
-        my_fishing_client["Bait Score"] = best_catch["Bait Score"]
-        my_fishing_client["Fish Ranking(1-10)(Each Type)"] = best_catch["Fish Ranking(1-10)(Each Type)"]
-        my_fishing_client["FishBucket"] = best_catch["FishBucket"]
 
         ActiveFishRank:set(best_catch["Fish Ranking(1-10)(Each Type)"])
         CurrentFishName:set(FName(best_catch["CurrentFishName"]))
 
         LuckierFishBite.ReportFishBite()
     end
+
+    LuckierFishBite.DecideFishFuncAddr = nil
 
     LuckierFishBite.DecideFishHookName = "/Game/Fishing/FishingAlgorithm/ClientSideMagic/AC_FishingonClientWIZARD.AC_FishingonClientWIZARD_C:DecideFish (FishBites)"
     LuckierFishBite.HookDecideFish = function()
@@ -252,12 +314,24 @@ return function(mod_settings)
             end
 
             LuckierFishBite.IsRerollingOnFishBite = true
-            LuckierFishBite.OnFishBite(self, IsInCave, IsInHotspot, ActiveFishRank, CurrentFishName)
+            GonFishModAPI.RemoveFunctionPrehook("DecideFish (FishBites)")
+            pcall(function() LuckierFishBite.OnFishBite(self, IsInCave, IsInHotspot, ActiveFishRank, CurrentFishName) end)
+            LuckierFishBite.PreFishBiteState = nil
+            GonFishModAPI.AddFunctionPrehook("DecideFish (FishBites)", LuckierFishBite.DecideFishFuncAddr, LuckierFishBite.OnFishBite_Pre)
             LuckierFishBite.IsRerollingOnFishBite = false
         end)
 
         LuckierFishBite.DecideFishPreHookId = DecideFishPreHookId
         LuckierFishBite.DecideFishPostHookId = DecideFishPostHookId
+
+        local TargetFunction = StaticFindObject(LuckierFishBite.DecideFishHookName)
+        if TargetFunction:IsValid() and GonFishModAPI.AddFunctionPrehook then
+            local addr_hex = string.format("%X", TargetFunction:GetAddress())
+            LuckierFishBite.DecideFishFuncAddr = addr_hex
+            GonFishModAPI.AddFunctionPrehook("DecideFish (FishBites)", LuckierFishBite.DecideFishFuncAddr, LuckierFishBite.OnFishBite_Pre)
+        else
+            print("[LuckierFishBite] CANNOT REGISTER PREHOOK !!\n")
+        end
     end
 
     LuckierFishBite.FishOnHookName = "/Game/Fishing/FishingAlgorithm/ClientSideMagic/AC_FishingonClientWIZARD.AC_FishingonClientWIZARD_C:FIshON"

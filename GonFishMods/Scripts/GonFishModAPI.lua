@@ -211,7 +211,7 @@ end
 
 print("[GonFishModAPI] delaying hooks and dll loading ...\n")
 
-RetriggerableExecuteInGameThreadWithDelay(GonFishModAPI.TreadWithDelayID, 2000, function()
+LoopAsync(2000, function()
     print("[GonFishModAPI] hooking and loading dlls ...\n")
 
     if not GonFishModAPI.RegisteredHookOnExecuteUbergraph_Message then
@@ -243,31 +243,40 @@ RetriggerableExecuteInGameThreadWithDelay(GonFishModAPI.TreadWithDelayID, 2000, 
     local dll_path = cur_path .. "/Lib/ExtendedBPHooker.dll"
 
     print("[GonFishModAPI] loading dll at :: " .. dll_path .. "\n")
-
     local add_function_prehook, err = package.loadlib(dll_path, "add_function_prehook")
     if not add_function_prehook then
         print("[GonFishModAPI] DLL Load Error: " .. tostring(err) .. "\n")
     else
         GonFishModAPI.AddFunctionPrehook = add_function_prehook
     end
-
+    
     local add_random_float_in_range_posthook, err = package.loadlib(dll_path, "add_random_float_in_range_posthook")
     if not add_random_float_in_range_posthook then
         print("[GonFishModAPI] DLL Load Error: " .. tostring(err) .. "\n")
     else
         GonFishModAPI.AddRandomFloatInRangePosthook = add_random_float_in_range_posthook
     end
-
+    
     local add_random_integer_in_range_posthook, err = package.loadlib(dll_path, "add_random_integer_in_range_posthook")
     if not add_random_integer_in_range_posthook then
         print("[GonFishModAPI] DLL Load Error: " .. tostring(err) .. "\n")
     else
         GonFishModAPI.AddRandomIntegerInRangePosthook = add_random_integer_in_range_posthook
     end
+    
+    local remove_function_prehook, err = package.loadlib(dll_path, "remove_function_prehook")
+    if not remove_function_prehook then
+        print("[GonFishModAPI] DLL Load Error: " .. tostring(err) .. "\n")
+    else
+        GonFishModAPI.RemoveFunctionPrehook = remove_function_prehook
+    end
+
 
     LoopAsync(10, GonFishModAPI.OnTick)
 
     GonFishModAPI.initialized = true
+
+    return true
 end)
 
 return GonFishModAPI

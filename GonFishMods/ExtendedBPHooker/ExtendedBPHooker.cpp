@@ -264,6 +264,7 @@ extern "C" {
     typedef void __fastcall (*lua_pushnumber_t)(lua_State *L, long double n);
     typedef int __fastcall (*lua_isnumber_t)(lua_State *L, int idx);
     typedef double __fastcall (*lua_tonumberx_t)(lua_State *L, int idx, int *pisnum);
+    typedef uint64_t __fastcall (*lua_type_t)(lua_State *L, int idx);
 
     luaL_checklstring_t r_luaL_checklstring = nullptr;
     lua_pushboolean_t r_lua_pushboolean = nullptr;
@@ -278,6 +279,7 @@ extern "C" {
     lua_pushnumber_t r_lua_pushnumber = nullptr;
     lua_isnumber_t r_lua_isnumber = nullptr;
     lua_tonumberx_t r_lua_tonumberx = nullptr;
+    lua_type_t r_lua_type = nullptr;
 
     struct FakeFString {
         wchar_t* Data;
@@ -286,9 +288,11 @@ extern "C" {
     };
 
     typedef void __fastcall (*uobject_process_internal_t)(void *uobject, void *fframe, void *result);
+    typedef void __fastcall (*uobject_exec_local_virtual_function_t)(void *uobject, void *fframe, void *result);
+    typedef void __fastcall (*uobject_exec_virtual_function_t)(void *uobject, void *fframe, void *result);
+    typedef void __fastcall (*uobject_exec_final_function_t)(void *uobject, void *fframe, void *result);
     typedef FakeFString * __fastcall (*uobject_base_utility_get_full_name_t)(void* Object, FakeFString* OutStr, void* StopOuter, uint32_t Flags);
     typedef void __thiscall (*uobject_process_event_t)(void *_this, void *pFunction, void *pParms);
-    typedef void __thiscall (*aactor_process_event_t)(void *_this, void *pFunction, void *pParms);
     typedef void __fastcall (*exec_call_math_function_t)(void *uobject, void *fframe, void *a3);
     typedef void __fastcall (*ukismet_math_library_exec_random_float_in_range_t)(void *uobject, void *fframe, double *output);
     typedef void __fastcall (*ukismet_math_library_exec_random_integer_in_range_t)(void *uobject, void *fframe, int *output);
@@ -298,8 +302,10 @@ extern "C" {
     typedef void __fastcall (*fframe_step_explicit_property_t)(void *fframe, void *a2, void *fproperty);
 
     uobject_process_internal_t r_uobject_process_internal = nullptr;
+    uobject_exec_local_virtual_function_t r_uobject_exec_local_virtual_function = nullptr;
+    uobject_exec_virtual_function_t r_uobject_exec_virtual_function = nullptr;
+    uobject_exec_final_function_t r_uobject_exec_final_function = nullptr;
     uobject_base_utility_get_full_name_t r_uobject_base_utility_get_full_name = nullptr;
-    aactor_process_event_t r_aactor_process_event = nullptr;
     uobject_process_event_t r_uobject_process_event = nullptr;
     exec_call_math_function_t r_exec_call_math_function = nullptr;
     ukismet_math_library_exec_random_float_in_range_t r_ukismet_math_library_exec_random_float_in_range = nullptr;
@@ -422,6 +428,14 @@ extern "C" {
             "lua_isnumber",
             (void**)&r_lua_isnumber,
             true
+        },
+        {
+            ParseSignature("48 83 EC ? E8 ? ? ? ? 4C 8B C8"),
+            {NULL, NULL, NULL, NULL},
+            0,
+            "lua_type",
+            (void**)&r_lua_type,
+            true
         }
     };
 
@@ -516,6 +530,30 @@ extern "C" {
             (void**)&r_fframe_step_explicit_property,
             true
         },
+        {
+            ParseSignature("48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 42 ? 48 8B DA 49 8B F0"),
+            {NULL, NULL, NULL, NULL},
+            0,
+            "UObject::execLocalVirtualFunction",
+            (void**)&r_uobject_exec_local_virtual_function,
+            true
+        },
+        {
+            ParseSignature("48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 42 ? 48 8B FA 49 8B D8"),
+            {NULL, NULL, NULL, NULL},
+            0,
+            "UObject::execVirtualFunction",
+            (void**)&r_uobject_exec_virtual_function,
+            true
+        },
+        {
+            ParseSignature("48 8B 42 ? 4C 8B 08 48 83 C0 ? 48 89 42 ? E9"),
+            {NULL, NULL, NULL, NULL},
+            0,
+            "UObject::execFinalFunction",
+            (void**)&r_uobject_exec_final_function,
+            true
+        },
     };
 
 
@@ -551,6 +589,7 @@ extern "C" {
 
     struct lua_hook {
         lua_State *L;
+        std::string name;
         int luaCallbackRef;
     };
 
@@ -559,12 +598,14 @@ extern "C" {
     std::recursive_mutex exec_random_float_in_range_mutex;
     std::recursive_mutex exec_random_integer_in_range_mutex;
     std::recursive_mutex g_mutex;
+    std::mutex lua_state_mutex;
+    std::mutex lua_execute_mutex;
     std::unordered_map<void *, lua_hook> lua_bp_prehooks;
     std::vector<lua_hook> lua_random_float_in_range_posthooks;
     std::vector<lua_hook> lua_random_integer_in_range_posthooks;
 
     void __fastcall hook_ukismet_math_library_exec_random_float_in_range(void *uobject, void *fframe, double *output) {
-        //std::lock_guard<std::recursive_mutex> lock(exec_random_float_in_range_mutex);
+        std::lock_guard<std::recursive_mutex> lock(g_mutex);
 
         void *v5; // r8
         void *v6; // r8
@@ -621,10 +662,14 @@ extern "C" {
         }
 
         for (const lua_hook &lua_posthook : lua_random_float_in_range_posthooks) {
-            std::lock_guard<std::recursive_mutex> lock(g_mutex);
-
             lua_State *L = lua_posthook.L;
             r_lua_rawgeti(L, LUA_REGISTRYINDEX, lua_posthook.luaCallbackRef);
+            uint64_t lua_type = r_lua_type(L, -1);
+            if (lua_type != 6) { // LUA_TFUNCTION
+                printf("[ExtendedBPHooker] lua callback is not a function (type: %lld)\n", lua_type);
+                r_lua_pop(L, 1);
+                return;
+            }
 
             r_lua_pushnumber(L,  min);
             r_lua_pushnumber(L,  max);
@@ -647,7 +692,7 @@ extern "C" {
     }
 
     void __fastcall hook_ukismet_math_library_exec_random_integer_in_range(void *uobject, void *fframe, int *output) {
-        //std::lock_guard<std::recursive_mutex> lock(exec_random_integer_in_range_mutex);
+        std::lock_guard<std::recursive_mutex> lock(g_mutex);
 
         void *v5; // r8
         void *v6; // r8
@@ -720,10 +765,14 @@ extern "C" {
         }
 
         for (const lua_hook &lua_posthook : lua_random_integer_in_range_posthooks) {
-            std::lock_guard<std::recursive_mutex> lock(g_mutex);
-
             lua_State *L = lua_posthook.L;
             r_lua_rawgeti(L, LUA_REGISTRYINDEX, lua_posthook.luaCallbackRef);
+            uint64_t lua_type = r_lua_type(L, -1);
+            if (lua_type != 6) { // LUA_TFUNCTION
+                printf("[ExtendedBPHooker] lua callback is not a function (type: %lld)\n", lua_type);
+                r_lua_pop(L, 1);
+                return;
+            }
 
             r_lua_pushnumber(L, (double)min);
             r_lua_pushnumber(L, (double)max);
@@ -745,18 +794,21 @@ extern "C" {
         }
     }
 
-    void __fastcall hook_uobject_process_internal(void *uobject, void *fframe, void *result) {
-        //std::lock_guard<std::recursive_mutex> lock(process_internal_mutex);
-
+    void check_fframe_and_execute_callback(void *uobject, void *fframe) {
         if (fframe) {
             void *u_fun_ptr = *(void **)((size_t)fframe + 0x10); // can be 0x08 sometimes too
             auto it = lua_bp_prehooks.find(u_fun_ptr);
 
             if (it != lua_bp_prehooks.end()) {
-                std::lock_guard<std::recursive_mutex> lock(g_mutex);
 
                 lua_State *L = it->second.L;
                 r_lua_rawgeti(L, LUA_REGISTRYINDEX, it->second.luaCallbackRef);
+                uint64_t lua_type = r_lua_type(L, -1);
+                if (lua_type != 6) { // LUA_TFUNCTION
+                    printf("[ExtendedBPHooker] lua callback is not a function (type: %lld)\n", lua_type);
+                    r_lua_pop(L, 1);
+                    return;
+                }
 
                 std::string full_name = GetNameFromPointers(uobject);
                 r_lua_pushstring(L, full_name.c_str());
@@ -767,26 +819,52 @@ extern "C" {
                 }
             }
         }
+    }
 
+    void __fastcall hook_uobject_exec_final_function(void *uobject, void *fframe, void *result) {
+        std::lock_guard<std::recursive_mutex> lock(g_mutex);
+        check_fframe_and_execute_callback(uobject, fframe);
+        return r_uobject_exec_final_function(uobject, fframe, result);
+    }
+
+    void __fastcall hook_uobject_exec_virtual_function(void *uobject, void *fframe, void *result) {
+        std::lock_guard<std::recursive_mutex> lock(g_mutex);
+        check_fframe_and_execute_callback(uobject, fframe);
+        return r_uobject_exec_virtual_function(uobject, fframe, result);
+    }
+
+    void __fastcall hook_uobject_exec_local_virtual_function(void *uobject, void *fframe, void *result) {
+        std::lock_guard<std::recursive_mutex> lock(g_mutex);
+        check_fframe_and_execute_callback(uobject, fframe);
+        return r_uobject_exec_local_virtual_function(uobject, fframe, result);
+    }
+
+    void __fastcall hook_uobject_process_internal(void *uobject, void *fframe, void *result) {
+        std::lock_guard<std::recursive_mutex> lock(g_mutex);
+        check_fframe_and_execute_callback(uobject, fframe);
         return r_uobject_process_internal(uobject, fframe, result);
     }
 
     void __stdcall hook_uobject_process_event(void *_this, void *pFunction, void *pParms) {
-        //std::lock_guard<std::recursive_mutex> lock(process_event_mutex);
+        std::lock_guard<std::recursive_mutex> lock(g_mutex);
 
         auto it = lua_bp_prehooks.find(pFunction);
         if (it != lua_bp_prehooks.end()) {
-            std::lock_guard<std::recursive_mutex> lock(g_mutex);
-
             lua_State *L = it->second.L;
             r_lua_rawgeti(L, LUA_REGISTRYINDEX, it->second.luaCallbackRef);
-
-            std::string full_name = GetNameFromPointers(_this);
-            r_lua_pushstring(L, full_name.c_str());
-
-            if (r_lua_pcall(L, 1, 0, 0) != 0) {
-                printf("[ExtendedBPHooker] lua callback error: %s\n", r_lua_tostring(L, -1));
+            uint64_t lua_type = r_lua_type(L, -1);
+            if (lua_type != 6) { // LUA_TFUNCTION
+                printf("[ExtendedBPHooker] lua callback is not a function (type: %lld)\n", lua_type);
                 r_lua_pop(L, 1);
+            }
+            else {
+                std::string full_name = GetNameFromPointers(_this);
+                r_lua_pushstring(L, full_name.c_str());
+
+                if (r_lua_pcall(L, 1, 0, 0) != 0) {
+                    printf("[ExtendedBPHooker] lua callback error: %s\n", r_lua_tostring(L, -1));
+                    r_lua_pop(L, 1);
+                }
             }
         }
 
@@ -808,6 +886,9 @@ extern "C" {
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
         DetourAttach(&(PVOID&)r_uobject_process_internal, hook_uobject_process_internal);
+        DetourAttach(&(PVOID&)r_uobject_exec_local_virtual_function, hook_uobject_exec_local_virtual_function);
+        DetourAttach(&(PVOID&)r_uobject_exec_virtual_function, hook_uobject_exec_virtual_function);
+        DetourAttach(&(PVOID&)r_uobject_exec_final_function, hook_uobject_exec_final_function);
         DetourAttach(&(PVOID&)r_uobject_process_event, hook_uobject_process_event);
         DetourAttach(&(PVOID&)r_ukismet_math_library_exec_random_float_in_range, hook_ukismet_math_library_exec_random_float_in_range);
         DetourAttach(&(PVOID&)r_ukismet_math_library_exec_random_integer_in_range, hook_ukismet_math_library_exec_random_integer_in_range);
@@ -847,10 +928,19 @@ extern "C" {
             return 0;
         }
 
-        r_luaL_checktype(L, 1, 6);
+        size_t label_sz = 0;
+        const char *label_str = r_luaL_checklstring(L, 1, &label_sz);
+
+        if (!label_str) {
+            r_lua_pushboolean(L, 0);
+            return 1;
+        }
+
+        r_luaL_checktype(L, 2, 6);
         int callbackRef = r_luaL_ref(L, LUA_REGISTRYINDEX);
 
-        lua_random_float_in_range_posthooks.push_back({L, callbackRef});
+        lua_random_float_in_range_posthooks.push_back({L, std::string(label_str), callbackRef});
+        printf("[ExtendedBPHooker] added RandomFloatInRange posthook [%s]\n", label_str);
 
         r_lua_pushboolean(L, 1);
         return 1;
@@ -864,12 +954,50 @@ extern "C" {
             return 0;
         }
 
-        r_luaL_checktype(L, 1, 6);
+        size_t label_sz = 0;
+        const char *label_str = r_luaL_checklstring(L, 1, &label_sz);
+
+        if (!label_str) {
+            r_lua_pushboolean(L, 0);
+            return 1;
+        }
+
+        r_luaL_checktype(L, 2, 6);
         int callbackRef = r_luaL_ref(L, LUA_REGISTRYINDEX);
 
-        lua_random_integer_in_range_posthooks.push_back({L, callbackRef});
+        lua_random_integer_in_range_posthooks.push_back({L, std::string(label_str), callbackRef});
+        printf("[ExtendedBPHooker] added RandomIntegerInRange posthook [%s]\n", label_str);
 
         r_lua_pushboolean(L, 1);
+        return 1;
+    }
+
+    __declspec(dllexport) int remove_function_prehook(lua_State *L) {
+        std::lock_guard<std::recursive_mutex> lock(g_mutex);
+
+        if (!r_luaL_checklstring || !r_lua_pushboolean || !r_luaL_ref) {
+            printf("[ExtendedBPHooker] functions are missing !!\n");
+            return 0;
+        }
+
+        size_t label_sz = 0;
+        const char *label_str = r_luaL_checklstring(L, 1, &label_sz);
+        bool res = false;
+
+        auto it = lua_bp_prehooks.begin();
+        while (it != lua_bp_prehooks.end()) {
+            if (it->second.name == label_str) {
+                it = lua_bp_prehooks.erase(it);
+                res = true;
+            }
+            else
+                ++it;
+        }
+
+        if (res)
+            printf("[ExtendedBPHooker] deleted prehook for [%s] !!\n", label_str);
+
+        r_lua_pushboolean(L, res);
         return 1;
     }
 
@@ -899,9 +1027,9 @@ extern "C" {
         void *pFunc = (void*)func_addr;
 
         if (pFunc) {
-            lua_hook lph = {L, callbackRef};
+            lua_hook lph = {L, std::string(label_str), callbackRef};
             lua_bp_prehooks[pFunc] = lph;
-            printf("[ExtendedBPHooker] added hook for :: 0x%p\n", pFunc);
+            printf("[ExtendedBPHooker] added hook for [%s] :: 0x%p\n", label_str, pFunc);
 
             r_lua_pushboolean(L, 1);
             return 1;

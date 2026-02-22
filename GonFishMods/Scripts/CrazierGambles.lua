@@ -109,7 +109,7 @@ return function(mod_settings)
     CrazeirGambles.BloodPoolFunctionInstances = {}
 
     CrazeirGambles.TryFindBloodpoolScaleFishCompeteServer = function()
-        if not (GonFishModAPI.AddFunctionPrehook and GonFishModAPI.AddRandomFloatInRangePosthook) then
+        if not GonFishModAPI.AddFunctionPrehook then
             print("[CrazeirGambles] missing necesary hooking functions, exiting\n")
             return
         end
@@ -145,7 +145,12 @@ return function(mod_settings)
         GonFishModAPI.AddTask(500, CrazeirGambles.TryFindBloodpoolScaleFishCompeteServer)
     end
 
-    GonFishModAPI.AddRandomFloatInRangePosthook(CrazeirGambles.RandomFloatInRange_Post)
+    if not GonFishModAPI.AddRandomFloatInRangePosthook then
+        print("[CrazeirGambles] missing necesary hooking functions, exiting\n")
+        return
+    end
+
+    GonFishModAPI.AddRandomFloatInRangePosthook("ScaleFishCompeteServer", CrazeirGambles.RandomFloatInRange_Post)
     print("[CrazeirGambles] starting a bloodpoolfinder loop\n")
     GonFishModAPI.AddTask(500, CrazeirGambles.TryFindBloodpoolScaleFishCompeteServer)
 end
